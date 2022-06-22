@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <button onclick="handleShare">Share Screen</button>
+    <script src="http://sdk.twilio.com/js/video/releases/2.21.3/twilio-video.min.js"></script>
+    <script>
+      const TOKEN =
+        "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImN0eSI6InR3aWxpby1mcGE7dj0xIn0.eyJqdGkiOiJTS2QxN2Q2NWMzZTdmMzRkYThkZDExYWJlMWMwOGZjOTgwLTE2NTU4MTIxOTMiLCJncmFudHMiOnsidmlkZW8iOnsicm9vbSI6IioifSwiaWRlbnRpdHkiOiJ0ZXN0MiJ9LCJpc3MiOiJTS2QxN2Q2NWMzZTdmMzRkYThkZDExYWJlMWMwOGZjOTgwIiwiZXhwIjoxNjU1ODE1NzkzLCJuYmYiOjE2NTU4MTIxOTMsInN1YiI6IkFDYjFmMjNkZmFlODliY2Y1ODc4NGVkNDJmZDlkYWNkMTQifQ.hB6g-ZP6hxz29o4vvq4TDFwmGaia81Ec64IhIcC_OIg";
+
+      const Video = Twilio.Video;
+      let room;
+      Video.connect(TOKEN, {
+        name: "test2-room",
+        video: false,
+        audio: false,
+      }).then((room) => {
+        console.log(room, room.on);
+
+        room.on("participantConnected", (...args) =>
+          console.log("connected", args)
+        );
+        room.on("participantDisconnected", (...args) =>
+          console.log("disconnected", args)
+        );
+        room.on("trackPublished", (publication, participant) => {
+          console.log("Track was published to room", publication);
+        });
+      });
+
+      async function handleShare() {
+        if (room === undefined) {
+          alert("Twilio room not joined yet");
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          preferCurrentTab: true,
+        });
+        room.localParticipant.publishTracks(stream.getTracks());
+      }
+    </script>
+  </body>
+</html>

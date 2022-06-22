@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <video controls width="80%" height="80%"></video>
+    <button id="share">Share Screen</button>
+    <script src="http://sdk.twilio.com/js/video/releases/2.21.3/twilio-video.min.js"></script>
+    <script>
+      const Video = Twilio.Video;
+      const HEADERS = {
+        accept: "application/json, text/plain, */*",
+        "tekion-api-token": prompt("Enter tekion-api-token"),
+        userid: 228,
+        tenantname: "cacargroup",
+        roleid: "5_Technician",
+        dealerid: 5,
+        "tek-siteid": "-1_5",
+      };
+      const videoEl = document.querySelector("video");
+
+      // Global var to access twilio room
+      let room;
+      async function connectToRoom() {
+        // Sample ID to identify this user/client on twilio
+        const id = `sample-id-${Math.random()}`;
+        const BASE_URL = "https://api.tekion.xyz/api/";
+        // const BASE_URL = "http://localhost:9090/";
+        const TOKEN_API_URL = `${BASE_URL}esign/u/twilio/auth/${id}/`;
+
+        // Fetch twilio token
+        const response = await (
+          await fetch(TOKEN_API_URL, {
+            method: "POST",
+            headers: HEADERS,
+          })
+        ).json();
+        const TOKEN = response.data;
+        console.log("got twilio token", TOKEN);
+
+        // Join room
+        Video.connect(TOKEN, {
+          name: "test-room",
+          video: false,
+          audio: false,
+        }).then((r) => {
+          room = r;
+          console.log(room, room.on);
+          handleRoom(r);
+        });
+      }
+
+      function handleRemotePublication(publication) {
+        function handle(track) {
+          track.attach(videoEl);
+          try {
+            // Might fail if user has not interacted with page
+            videoEl.play();
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        if (publication.track) {
+          handle(publication.track);
+        }
+        publication.on("subscribed", handle);
+      }
+
+      function handleRemoteUnpublish(publication) {
+        function handle(track) {
+          track.detach(videoEl);
+          videoEl.srcObject = null;
+        }
+
+        if (publication.track) {
+          handle(publication.track);
+        }
+        publication.on("subscribed", handle);
+      }
+
+      // Called once we join a twilio room
+      function handleRoom(room) {
+        // Check for pre-existing tracks in the room
+        Object.values(Array.from(room.participants.values())).forEach(
+          (participant) => {
+            console.log(participant);
+            console.log(participant.identity, participant.tracks);
+            Array.from(participant.tracks.values()).forEach(
+              handleRemotePublication
+            );
+          }
+        );
+
+        // Attach event listeners
+
+        room.on("participantConnected", (...args) =>
+          console.log("connected", args)
+        );
+        room.on("participantDisconnected", (...args) =>
+          console.log("disconnected", args)
+        );
+
+        room.on("trackPublished", (publication, participant) => {
+          // When a track is published, we display it
+          console.log("Track was published to room", publication);
+          handleRemotePublication(publication);
+        });
+
+        room.on("trackUnpublished", (publication, participant) => {
+          handleRemoteUnpublish(publication);
+        });
+      }
+
+      async function handleShare() {
+        if (room === undefined) {
+          alert("Twilio room not joined yet!");
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          preferCurrentTab: true,
+        });
+        // Publish our stream to the twilio room
+        room.localParticipant.publishTracks(stream.getTracks());
+      }
+
+      document.querySelector("#share").addEventListener("click", handleShare);
+      connectToRoom();
+    </script>
+  </body>
+</html>
